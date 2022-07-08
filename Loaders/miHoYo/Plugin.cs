@@ -264,10 +264,10 @@ public class Plugin : IPlugin, ILoadPipeline
             Name = "game",
             Description = "Honkai version to use for decryption",
             Required = true,
-            Value = "honkai-impact-5.6",
+            Value = "honkai-impact-5.8",
             Choices = new Dictionary<string, string>
             {
-                ["honkai-impact-5.6"] = "Honkai Impact 5.6"
+                ["honkai-impact-5.8"] = "Honkai Impact 5.8"
             }
         };
 
@@ -286,7 +286,7 @@ public class Plugin : IPlugin, ILoadPipeline
         // You have to find these by reverse-engineering the code yourself
         private Dictionary<string, UnityOffsets> Offsets = new Dictionary<string, UnityOffsets>
         {
-            ["honkai-impact-5.6"] = new UnityOffsets { DecryptMetadata = 0xC9C20, GetStringFromIndex = 0xC8AED0, GetStringLiteralFromIndex = 0xC8AEC0 },
+            ["honkai-impact-5.8"] = new UnityOffsets { DecryptMetadata = 0xC9C10, GetStringFromIndex = 0xC7FBF0, GetStringLiteralFromIndex = 0xC7FC00 },
 
         };
 
@@ -361,10 +361,23 @@ public class Plugin : IPlugin, ILoadPipeline
             metadataBlob = new byte[stream.Length];
             Marshal.Copy(decryptedBytesUnmanaged, metadataBlob, 0, (int)stream.Length);
 
+            var key = new byte[] { 0x3f, 0x73, 0xa8, 0x5a, 0x08, 0x32, 0x0a, 0x33, 0x3c, 0xfa, 0xa3, 0x4e, 0x8b, 0x0c, 0x77, 0x45 };
+
+            // The step is based on the file size
+            var step = (int)(stream.Length >> 14) << 6;
+
+            for (var pos = 0; pos < metadataBlob.Length; pos += step)
+                for (var b = 0; b < 0x10; b++)
+                    metadataBlob[pos + b] ^= key[b];
+
             // We replace the loaded global-metadata.dat with the newly decrypted version,
             // allowing Il2CppInspector to analyze it as normal
             stream.Write(0, metadataBlob);
-
+            
+            // Right decrypted data to current folder for testing
+            //File.WriteAllBytes("global_metadedecrypteted.dat", metadataBlob);
+            
+            
             // Some types have reordered fields - these calls tell Il2CppInspector what the correct field order is
             // See MappedTypes.cs for details
             stream.AddObjectMapping(typeof(Il2CppInspector.Il2CppGlobalMetadataHeader), typeof(Il2CppGlobalMetadataHeader));
